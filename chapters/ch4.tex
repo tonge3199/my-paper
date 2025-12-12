@@ -1,44 +1,8 @@
-% chapter4.tex
-\chapter{实验结果与分析}
-\label{chap:experiment}
+\chapter{总结与展望}
+\label{chap:conclusion}
 
-\section{实验环境与设置}
+\section{全文总结}
+本文成功构建并验证了基于扩散过程的图像生成模型……
 
-  \subsection{软硬件环境介绍}
-  % PyTorch version, GPU model (e.g., RTX 3060/Colab Tesla T4)
-
-  \subsection{数据集选取与预处理}
-  % MNIST / CIFAR-10 description
-
-  \subsection{评价指标说明}
-  % FID, IS, Loss Curve explanation
-
-\section{模型训练过程分析}
-
-  \subsection{损失函数收敛曲线分析}
-	% Insert Loss Curve Image
-	% \begin{figure}[htbp]
-		%     \centering
-		%     \includegraphics[width=0.8\textwidth]{figures/loss_curve.png}
-		%     \caption{模型训练损失函数收敛曲线}
-		%     \label{fig:loss_curve}
-		% \end{figure}
-
-  \subsection{不同训练阶段的中间结果可视化}
-  % Show noisy images at different epochs
-
-\section{图像生成质量验证}
-
-  \subsection{无条件生成结果展示与质量评估}
-  % Show grid of generated images
-
-  \subsection{条件控制生成效果演示}
-  % Show specific class generation (e.g., generating only "cats" or number "5")
-
-\section{对比实验与消融研究}
-
-  \subsection{不同采样步数对生成质量与速度的影响}
-  % Compare T=1000 vs T=50 (DDIM)
-
-  \subsection{不同网络深度/宽度对模型性能的影响分析}
-  % Optional: Comparison table
+\section{存在不足与未来改进方向}
+尽管模型能够生成清晰的图像，但推理速度相较于GAN仍然较慢……未来可以探索潜在扩散模型（Latent Diffusion Models）……
