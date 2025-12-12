@@ -1,12 +1,139 @@
-\section{图像生成模型的设计与算法实现}
+% !TeX root = ../main.tex
 
-3.1 模型整体架构设计
-•	3.1.1 噪声预测网络（Noise Prediction Network）总体结构
-•	3.1.2 基于U-Net的特征提取与还原模块设计
-•	3.1.3 时间步嵌入（Time Embedding）的位置编码实现 
-3.2 条件控制机制的实现
-•	3.2.1 类别信息的嵌入方法（Class Embedding）
-•	3.2.2 无分类器引导（Classifier-Free Guidance）的实现原理 
-3.3 核心算法的伪代码与程序流程
-•	3.3.1 训练阶段：随机时间步采样与梯度下降算法
-•	3.3.2 推理阶段：逐步去噪与图像生成的迭代算法
+\section{图像生成模型的设计与算法实现}
+\label{sec:implementation}
+
+本章将详细阐述基于去噪扩散概率模型（DDPM）的生成系统设计。我们将从网络架构的微观设计入手，结合 `ddpm\_torch` 代码库的实际实现，探讨如何构建能够有效预测噪声的神经网络，进而介绍条件控制机制的扩展方式，最后通过形式化的伪代码描述模型的训练与推理流程，并给出具体的实验参数配置。
+\subsection{模型整体架构设计}
+
+扩散模型的核心任务是训练一个噪声预测网络 $\boldsymbol{\epsilon}_{\theta}(\mathbf{x}_t, t)$。由于该任务需要输入和输出具备相同的空间分辨率，且需在不同尺度上捕捉图像特征，本研究采用了基于 U-Net \cite{ronneberger2015u} 的改进架构。该架构通过“编码器-解码器”结构实现特征的多尺度提取与融合，并结合了现代卷积神经网络的设计原则，如残差连接、组归一化（Group Normalization）和自注意力机制。
+
+\subsubsection{噪声预测网络总体结构}
+根据代码实现细节，我们的网络架构主要由以下五个部分组成：
+
+\begin{enumerate}
+	\item **特征投影层（Input Projection）**：输入图像 $\mathbf{x}_t$ 首先通过一个 $3 \times 3$ 的卷积层（Padding=1）映射到初始通道维度（如 $C=128$），不仅保留了空间维度，还完成了初步的特征升维。
+	
+	\item **下采样编码器（Downsampling Encoder）**：由多个分辨率层级（Levels）组成。每个层级包含 $N$ 个残差模块（Residual Blocks），部分层级后接下采样模块。随着层级加深，特征图的空间分辨率逐步减半，通道数则按预设倍率（如 $1:2:2:2$）增加。
+	
+	\item **中间瓶颈层（Middle Block）**：位于 U-Net 的最底层，用于处理最低分辨率的特征图。该模块采用了“残差块 $\rightarrow$ 自注意力块 $\rightarrow$ 残差块”的堆叠结构，旨在捕捉图像的全局上下文信息。
+	
+	\item **上采样解码器（Upsampling Decoder）**：结构与编码器对称。每个层级首先将上一层的特征图进行上采样，并与编码器中对应层级的特征图进行通道拼接（Concatenation），随后通过 $N+1$ 个残差模块进行特征融合与重建。
+	
+	\item **输出预测层（Output Head）**：经过解码器恢复至原始分辨率的特征图，依次通过组归一化、SiLU 激活函数和一个 $3 \times 3$ 卷积层，最终输出与输入图像同形状的噪声预测值 $\boldsymbol{\epsilon}_{\text{pred}}$。
+\end{enumerate}
+
+\subsubsection{基于 U-Net 的特征提取与上采样模块设计}
+为了提升模型的生成质量和训练稳定性，我们在基础模块的设计上进行了以下针对性优化：
+
+**1. 预激活残差模块（Pre-activation Residual Block）**\\
+不同于传统的 ResNet 结构，本研究采用了宽残差网络（Wide ResNet）的变体。每个残差块包含两个卷积层，并在卷积操作前先行进行归一化和激活（Norm $\rightarrow$ Act $\rightarrow$ Conv）。具体配置如下：
+\begin{itemize}
+	\item **归一化**：统一采用 Group Normalization (GN)，设置组数 $G=32$，$\epsilon=10^{-6}$。相比于 Batch Normalization，GN 对 Batch Size 的变化不敏感，更适合生成任务。
+	\item **激活函数**：采用 SiLU (Sigmoid Linear Unit, $f(x)=x \cdot \sigma(x)$) \cite{elfwing2018sigmoid}，其平滑非单调的特性有助于梯度的深层传播。
+	\item **时间步注入**：时间步嵌入向量 $\mathbf{e}_t$ 经由一个线性层投影后，以**逐元素相加（Element-wise Sum）**的方式注入到第一个卷积层的输出特征中，从而调制网络对不同噪声水平的响应。
+	\item **Dropout**：在两个卷积层之间引入 Dropout（比率 $p=0.1$）以防止过拟合。
+\end{itemize}
+
+**2. 采样策略优化**\\
+为了减少棋盘格效应（Checkerboard Artifacts），我们摒弃了传统的最大池化和转置卷积：
+\begin{itemize}
+	\item **下采样**：采用步长为 2 的 $3 \times 3$ 卷积层（配合特定 Padding 保持特征对齐）。
+	\item **上采样**：采用最近邻插值（Nearest Neighbor Interpolation）将特征图放大 2 倍，随后接一个 $3 \times 3$ 卷积层以平滑特征。
+\end{itemize}
+
+**3. 自注意力机制（Self-Attention）**\\
+在低分辨率层级（如 $16 \times 16$），我们引入了多头自注意力模块。特征图 $\mathbf{h}$ 首先通过 $1 \times 1$ 卷积映射为查询 $Q$、键 $K$ 和值 $V$。注意力权重由 $A = \text{softmax}(\frac{QK^T}{\sqrt{d_k}})$ 计算，最终输出为 $\mathbf{h} + \text{Proj}_{\text{out}}(AV)$。为了优化初始训练阶段的梯度流，输出投影层 $\text{Proj}_{\text{out}}$ 的权重被初始化为零。
+
+\subsubsection{时间步嵌入的位置编码实现}
+由于 $p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)$ 的分布特性随 $t$ 剧烈变化，网络必须精确感知当前的时间步。我们采用 Transformer 中的正弦位置编码（Sinusoidal Positional Encoding）将标量 $t$ 映射为高维向量 $\mathbf{e}_t$。
+
+具体而言，首先将时间步 $t$ 编码为固定维度的正弦向量：
+\begin{equation}
+	\mathbf{e}_{\text{raw}}^{(2i)} = \sin\left(\frac{t}{10000^{2i/d}}\right), \quad \mathbf{e}_{\text{raw}}^{(2i+1)} = \cos\left(\frac{t}{10000^{2i/d}}\right)
+\end{equation}
+其中 $d$ 为基础通道数的 4 倍。随后，该向量通过一个由两层全连接层（Linear）和 SiLU 激活函数组成的多层感知机（MLP）进行变换，得到最终的时间步嵌入 $\mathbf{e}_t = \text{MLP}(\mathbf{e}_{\text{raw}})$。这一设计使得网络能够学习到时间步之间复杂的非线性依赖关系。
+
+\subsection{条件控制机制的实现}
+
+为了实现可控图像生成（如生成指定类别的数字或物体），我们在基础 U-Net 架构上扩展了条件控制接口。本研究采用了**类别嵌入（Class Embedding）**与**无分类器引导（Classifier-Free Guidance, CFG）**相结合的策略，这种设计无需在训练完成后额外引入独立的分类器，即可显著提升生成样本与目标类别的一致性。
+
+\subsubsection{类别信息的向量化与融合}
+在条件扩散模型中，类别标签 $y \in \{1, \dots, K\}$ 不再是简单的标量索引，而是作为一种全局上下文信号注入网络。具体的嵌入与融合流程如下：
+
+\begin{enumerate}
+	\item **类别嵌入映射**：首先，通过一个可学习的嵌入层（Embedding Layer）将离散的类别标签 $y$ 映射为致密的特征向量 $\mathbf{v}_y \in \mathbb{R}^{d_{\text{emb}}}$。为了保证特征融合的兼容性，该向量的维度 $d_{\text{emb}}$ 被设计为与时间步嵌入 $\mathbf{e}_t$ 的维度一致（即基础通道数的 4 倍）。
+	
+	\item **空标签处理**：为了支持无分类器引导算法，我们在嵌入层中预留了一个特殊的“空标签”（Null Token）$\emptyset$（通常索引设为 $0$ 或 $K+1$）。该标签对应的嵌入向量 $\mathbf{v}_\emptyset$ 同样是可学习的参数，用于表示无条件生成时的状态。
+	
+	\item **时序-类别特征融合**：在输入到 U-Net 的各个残差模块之前，我们将类别向量与时间步向量进行融合。本研究采用**逐元素相加（Element-wise Sum）**作为融合策略，即最终的上下文嵌入向量 $\mathbf{e}_{\text{ctx}}$ 计算如下：
+	\begin{equation}
+		\mathbf{e}_{\text{ctx}} = \text{MLP}_t(\mathbf{e}_t) + \text{MLP}_y(\mathbf{v}_y)
+	\end{equation}
+	其中 $\text{MLP}_t$ 和 $\text{MLP}_y$ 分别是针对时间步和类别的投影网络。这种加法融合策略利用了高维空间中不同语义特征的正交性，使得网络能够同时根据当前的噪声水平 $t$ 和目标类别 $y$ 动态调整特征图的分布，而无需显著增加计算开销。
+\end{enumerate}
+
+\subsubsection{无分类器引导（Classifier-Free Guidance）的算法实现}
+传统的条件生成依赖于一个在噪声图像上训练的分类器 $p_\phi(y|\mathbf{x}_t)$ 来提供梯度指引，这不仅增加了训练成本，还容易引入对抗攻击般的梯度假象。本研究采用无分类器引导（CFG）技术，其核心思想是利用生成模型本身来隐式地构建分类器梯度。
+
+**1. 联合训练策略**\\
+在训练阶段，我们并不总是向网络提供真实的类别标签 $y$。而是以一个固定的概率 $p_{\text{uncond}}$（本实验设为 0.1）将标签 $y$ 随机替换为空标签 $\emptyset$。这使得同一个神经网络 $\boldsymbol{\epsilon}_\theta$ 能够同时学习两个分布：
+\begin{itemize}
+	\item **条件分布** $\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, y)$：当输入真实标签时学习。
+	\item **无条件分布** $\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \emptyset)$：当输入空标签时学习，近似于数据本身的边际分布。
+\end{itemize}
+
+**2. 采样阶段的梯度外推**\\
+根据贝叶斯准则，隐式分类器的梯度 $\nabla_{\mathbf{x}_t} \log p(y|\mathbf{x}_t)$ 可以表示为条件得分与无条件得分之差。在推理（采样）阶段，我们将预测噪声修正为上述两者的线性组合：
+\begin{equation}
+	\tilde{\boldsymbol{\epsilon}}_\theta(\mathbf{x}_t, t, y) = \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \emptyset) + w \cdot \underbrace{\left( \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, y) - \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \emptyset) \right)}_{\text{隐式分类器梯度方向}}
+	\label{eq:cfg_formula}
+\end{equation}
+其中 $w$ 为引导尺度（Guidance Scale）。
+\begin{itemize}
+	\item 当 $w=1$ 时，退化为标准的条件生成。
+	\item 当 $w > 1$ 时，模型沿梯度方向进行“外推”，强化了条件信号 $y$ 的影响，使得生成的图像特征更典型，但可能会降低样本的多样性。
+\end{itemize}
+
+这种实现方式巧妙地规避了专门训练噪声分类器的需求，仅需在推理时进行两次前向传播（一次有条件，一次无条件），即可获得高质量的条件生成结果。
+
+\subsection{模型超参数配置与实现细节}
+
+为了确保实验的可复现性，本节列出了模型在 CIFAR-10 和 CelebA 数据集上的具体参数配置。所有超参数的设定均参考了 `configs/` 目录下的标准配置文件，并根据硬件环境进行了适配。
+
+\subsubsection{网络结构参数}
+网络架构基于改进的 U-Net。表 \ref{tab:model_params} 以 CIFAR-10 数据集为例，详细列出了关键的结构参数。值得注意的是，对于 CelebA 数据集（$64 \times 64$），虽然基础通道数保持为 128，但为了防止过拟合，我们将 Dropout 概率调整为 0.0，且注意力层依旧施加在 $16 \times 16$ 分辨率的特征图上。
+
+\begin{table}[htbp]
+	\centering
+	\caption{模型网络结构参数配置 (以 CIFAR-10 为例)}
+	\label{tab:model_params}
+	\begin{tabular}{l|c}
+		\hline
+		\textbf{参数名称} & \textbf{配置值} \\
+		\hline
+		基础通道数 (Base Channels) & 128 \\
+		通道倍率 (Channel Multipliers) & $[1, 2, 2, 2]$ \\
+		残差块数量 (ResBlocks per Scale) & 2 \\
+		注意力应用层级 (Apply Attention) & $16 \times 16$ 分辨率层 \\
+		时间嵌入维度 (Time Embed Dim) & $128 \times 4 = 512$ \\
+		Dropout 概率 & 0.1 (CelebA 为 0.0) \\
+		归一化方式 & GroupNorm (32 groups) \\
+		激活函数 & SiLU \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\subsubsection{扩散过程与训练参数}
+前向扩散过程采用线性方差调度策略（Linear Schedule），并结合指数移动平均（EMA）技术以稳定生成质量。具体设置如下：
+
+\begin{itemize}
+	\item **时间步设置**：总时间步数 $T = 1000$。
+	\item **方差策略**：方差范围从 $\beta_1 = 1 \times 10^{-4}$ 线性增加至 $\beta_T = 0.02$。在逆向过程中，CIFAR-10 模型采用 `fixed-large` 方差策略（即 $\sigma_t^2 = \beta_t$），而 CelebA 模型采用 `fixed-small` 策略（即 $\sigma_t^2 = \tilde{\beta}_t$），以适应不同数据集的分布特性。
+	\item **优化器**：使用 Adam 优化器，参数设定为 $\beta_1=0.9, \beta_2=0.999$，初始学习率设为 $2 \times 10^{-4}$。
+	\item **学习率调度**：训练初期设置 5000 步的线性预热（Warmup），随后保持恒定。
+	\item **梯度裁剪**：设置梯度范数阈值（Grad Norm Clip）为 1.0，防止梯度爆炸。
+	\item **EMA 策略**：训练过程中维护一个影子模型，其参数衰减率（Decay）设为 0.9999，推理时使用 EMA 参数。
+\end{itemize}
+
+在硬件环境方面，模型训练在单张 **NVIDIA GeForce RTX 5090 (32GB VRAM)** GPU 上进行。得益于 RTX 5090 强大的显存容量与计算能力，我们能够使用较大的批量大小（Batch Size = 128）进行训练，并结合混合精度（Mixed Precision）技术，在保证数值稳定性的同时显著缩短了收敛时间。

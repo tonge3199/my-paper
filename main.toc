@@ -1,19 +1,46 @@
-\contentsline {section}{摘要}{2}{section*.1}%
-\contentsline {section}{Abstract}{3}{section*.2}%
-\contentsline {section}{\numberline {1}引言}{4}{section.1}%
-\contentsline {section}{\numberline {2}扩散生成模型的数学原理与理论推导}{5}{section.2}%
-\contentsline {subsection}{\numberline {2.1}扩散模型的基本框架}{5}{subsection.2.1}%
-\contentsline {subsubsection}{\numberline {2.1.1}前向扩散过程：基于马尔可夫链的高斯加噪机制}{5}{subsubsection.2.1.1}%
-\contentsline {subsubsection}{\numberline {2.1.2}逆向去噪过程：参数化的去噪分布估计}{5}{subsubsection.2.1.2}%
-\contentsline {subsection}{\numberline {2.2}变分推断与目标函数推导}{6}{subsection.2.2}%
-\contentsline {subsubsection}{\numberline {2.2.1}变分下界（ELBO）的数学推导与展开}{6}{subsubsection.2.2.1}%
-\contentsline {subsubsection}{\numberline {2.2.2}KL散度与重参数化技巧的应用}{6}{subsubsection.2.2.2}%
-\contentsline {subsection}{\numberline {2.3}逆向过程的参数化与优化目标}{7}{subsection.2.3}%
-\contentsline {subsubsection}{\numberline {2.3.1}方差策略与均值的重参数化}{7}{subsubsection.2.3.1}%
-\contentsline {subsubsection}{\numberline {2.3.2}简化损失函数与去噪得分匹配的联系}{8}{subsubsection.2.3.2}%
-\contentsline {subsection}{\numberline {2.4}采样算法与离散数据处理}{8}{subsection.2.4}%
-\contentsline {subsubsection}{\numberline {2.4.1}采样过程：朗之万动力学视角}{8}{subsubsection.2.4.1}%
-\contentsline {subsubsection}{\numberline {2.4.2}数据缩放与解码项 $L_0$}{8}{subsubsection.2.4.2}%
-\contentsline {section}{\numberline {3}ch2这里是二}{9}{section.3}%
-\contentsline {section}{参考文献}{10}{section.3}%
+\contentsline {section}{摘要}{3}{section*.1}%
+\contentsline {section}{Abstract}{4}{section*.2}%
+\contentsline {section}{\numberline {1}引言}{5}{section.1}%
+\contentsline {section}{\numberline {2}扩散生成模型的数学原理与理论推导}{6}{section.2}%
+\contentsline {subsection}{\numberline {2.1}扩散模型的基本框架}{6}{subsection.2.1}%
+\contentsline {subsubsection}{\numberline {2.1.1}前向扩散过程：基于马尔可夫链的高斯加噪机制}{6}{subsubsection.2.1.1}%
+\contentsline {subsubsection}{\numberline {2.1.2}逆向去噪过程：参数化的去噪分布估计}{6}{subsubsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.2}变分推断与目标函数推导}{7}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}变分下界（ELBO）的数学推导与展开}{7}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}KL散度与重参数化技巧的应用}{7}{subsubsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.3}逆向过程的参数化与优化目标}{8}{subsection.2.3}%
+\contentsline {subsubsection}{\numberline {2.3.1}方差策略与均值的重参数化}{8}{subsubsection.2.3.1}%
+\contentsline {subsubsection}{\numberline {2.3.2}简化损失函数与去噪得分匹配的联系}{9}{subsubsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.4}采样算法与离散数据处理}{9}{subsection.2.4}%
+\contentsline {subsubsection}{\numberline {2.4.1}采样过程：朗之万动力学视角}{9}{subsubsection.2.4.1}%
+\contentsline {subsubsection}{\numberline {2.4.2}数据缩放与解码项 $L_0$}{9}{subsubsection.2.4.2}%
+\contentsline {section}{\numberline {3}图像生成模型的设计与算法实现}{10}{section.3}%
+\contentsline {subsection}{\numberline {3.1}模型整体架构设计}{10}{subsection.3.1}%
+\contentsline {subsubsection}{\numberline {3.1.1}噪声预测网络总体结构}{10}{subsubsection.3.1.1}%
+\contentsline {subsubsection}{\numberline {3.1.2}基于 U-Net 的特征提取与上采样模块设计}{10}{subsubsection.3.1.2}%
+\contentsline {subsubsection}{\numberline {3.1.3}时间步嵌入的位置编码实现}{11}{subsubsection.3.1.3}%
+\contentsline {subsection}{\numberline {3.2}条件控制机制的实现}{11}{subsection.3.2}%
+\contentsline {subsubsection}{\numberline {3.2.1}类别信息的向量化与融合}{11}{subsubsection.3.2.1}%
+\contentsline {subsubsection}{\numberline {3.2.2}无分类器引导（Classifier-Free Guidance）的算法实现}{12}{subsubsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.3}模型超参数配置与实现细节}{12}{subsection.3.3}%
+\contentsline {subsubsection}{\numberline {3.3.1}网络结构参数}{12}{subsubsection.3.3.1}%
+\contentsline {subsubsection}{\numberline {3.3.2}扩散过程与训练参数}{13}{subsubsection.3.3.2}%
+\contentsline {section}{\numberline {4}实验结果与分析}{14}{section.4}%
+\contentsline {subsection}{\numberline {4.1}实验环境与设置}{14}{subsection.4.1}%
+\contentsline {subsubsection}{\numberline {4.1.1}软硬件环境配置}{14}{subsubsection.4.1.1}%
+\contentsline {subsubsection}{\numberline {4.1.2}数据集选取与预处理}{14}{subsubsection.4.1.2}%
+\contentsline {subsubsection}{\numberline {4.1.3}评价指标说明}{14}{subsubsection.4.1.3}%
+\contentsline {subsection}{\numberline {4.2}模型训练过程分析}{15}{subsection.4.2}%
+\contentsline {subsubsection}{\numberline {4.2.1}损失函数收敛曲线分析}{15}{subsubsection.4.2.1}%
+\contentsline {subsubsection}{\numberline {4.2.2}不同训练阶段的中间结果可视化}{15}{subsubsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.3}图像生成质量验证}{15}{subsection.4.3}%
+\contentsline {subsubsection}{\numberline {4.3.1}无条件生成结果展示与质量评估}{15}{subsubsection.4.3.1}%
+\contentsline {subsubsection}{\numberline {4.3.2}条件控制生成效果演示}{17}{subsubsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.4}对比实验与消融研究}{17}{subsection.4.4}%
+\contentsline {subsubsection}{\numberline {4.4.1}不同采样步数对生成质量与速度的影响}{17}{subsubsection.4.4.1}%
+\contentsline {subsubsection}{\numberline {4.4.2}网络深度与宽度对模型性能的影响}{18}{subsubsection.4.4.2}%
+\contentsline {section}{\numberline {5}总结与展望}{19}{section.5}%
+\contentsline {section}{\numberline {6}全文总结}{19}{section.6}%
+\contentsline {section}{\numberline {7}存在不足与未来改进方向}{19}{section.7}%
+\contentsline {section}{参考文献}{20}{section.7}%
 \contentsfinish 
