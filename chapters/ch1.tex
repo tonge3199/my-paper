@@ -1,0 +1,161 @@
+\section{扩散生成模型的数学原理与理论推导}
+
+去噪扩散概率模型（Denoising Diffusion Probabilistic Models, DDPM）是一类基于非平衡热力学原理的生成模型。从统计学习的角度来看，它属于隐变量模型（Latent Variable Models）的一种范式。本章将详细阐述扩散模型的前向加噪与逆向去噪过程，并利用变分推断（Variational Inference）推导其训练目标函数。
+
+\subsection{扩散模型的基本框架}
+
+扩散模型的核心思想包含两个过程：一个固定的（或预定义的）**前向扩散过程**，用于逐渐向数据添加噪声直至其破坏为纯高斯噪声；以及一个可学习的**逆向去噪过程**，旨在通过学习噪声的分布来逐步恢复原始数据。
+
+\subsubsection{前向扩散过程：基于马尔可夫链的高斯加噪机制}
+给定从真实数据分布 $\mathbf{x}_{0} \sim q(\mathbf{x}_{0})$ 中采样的初始数据，我们定义一个前向扩散过程（Forward Process），即一个随时间步 $t$ 进行的马尔可夫链（Markov Chain）。该过程根据预设的方差调度策略（Variance Schedule）$\beta_1, \ldots, \beta_T$ 向数据中逐步添加高斯噪声。
+
+前向过程的联合分布 $q(\mathbf{x}_{1:T}|\mathbf{x}_0)$ 定义如下：
+\begin{equation}
+	q(\mathbf{x}_{1:T}|\mathbf{x}_0) := \prod_{t=1}^{T} q(\mathbf{x}_t|\mathbf{x}_{t-1})
+\end{equation}
+其中，单步转移概率 $q(\mathbf{x}_t|\mathbf{x}_{t-1})$ 服从高斯分布：
+\begin{equation}
+	q(\mathbf{x}_t|\mathbf{x}_{t-1}) := \mathcal{N}(\mathbf{x}_t; \sqrt{1 - \beta_t}\mathbf{x}_{t-1}, \beta_t\mathbf{I})
+\end{equation}
+这里，$\beta_t \in (0,1)$ 控制了每一步添加噪声的幅度。随着 $t$ 的增加，数据 $\mathbf{x}_0$ 的原始信号逐渐减弱。当 $T \to \infty$ 且 $\beta_t$ 设置合理时，$\mathbf{x}_T$ 将趋近于各向同性的标准高斯分布 $\mathcal{N}(\mathbf{0}, \mathbf{I})$。
+
+前向过程具有一个极其重要的数学特性，即允许我们在任意时间步 $t$ 直接从 $\mathbf{x}_0$ 采样 $\mathbf{x}_t$，而无需逐步迭代。引入符号 $\alpha_t := 1 - \beta_t$ 和累乘系数 $\bar{\alpha}_t := \prod_{s=1}^t \alpha_s$，则边缘分布 $q(\mathbf{x}_t|\mathbf{x}_0)$ 可表示为：
+\begin{equation}
+	q(\mathbf{x}_t|\mathbf{x}_0) = \mathcal{N}(\mathbf{x}_t; \sqrt{\bar{\alpha}_t}\mathbf{x}_0, (1 - \bar{\alpha}_t)\mathbf{I})
+	\label{eq:jump_sample}
+\end{equation}
+这一特性使得在训练过程中可以高效地随机采样任意时间步的数据，是扩散模型得以大规模训练的基础。
+
+\subsubsection{逆向去噪过程：参数化的去噪分布估计}
+逆向过程（Reverse Process）的目标是学习这一马尔可夫链的逆过程，即从高斯噪声 $\mathbf{x}_T \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ 开始，逐步去噪还原出样本 $\mathbf{x}_0$。
+
+由于真实的逆向条件分布 $q(\mathbf{x}_{t-1}|\mathbf{x}_t)$ 需要遍历整个数据集才能计算，因此是不可解的。我们使用一个参数化模型 $p_{\theta}$ 来近似该分布。根据 Feller 等人的理论，当 $\beta_t$ 足够小时，前向和逆向过程具有相同的函数形式，即高斯分布。因此，我们将逆向转移定义为：
+\begin{equation}
+	p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t) := \mathcal{N}(\mathbf{x}_{t-1}; \mathbf{\mu}_{\theta}(\mathbf{x}_t, t), \mathbf{\sigma}_{\theta}(\mathbf{x}_t, t))
+\end{equation}
+其中，$\mathbf{\mu}_{\theta}$ 和 $\mathbf{\Sigma}_{\theta}$ 是由神经网络预测的均值和方差。整个逆向过程的联合分布为：
+\begin{equation}
+	p_{\theta}(\mathbf{x}_{0:T}) := p(\mathbf{x}_T) \prod_{t=1}^{T} p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)
+\end{equation}
+其中初始状态 $p(\mathbf{x}_T) = \mathcal{N}(\mathbf{x}_T; \mathbf{0}, \mathbf{I})$。
+
+\subsection{变分推断与目标函数推导}
+
+为了训练神经网络参数 $\theta$，我们的目标是最大化模型生成真实数据 $\mathbf{x}_0$ 的对数似然 $\log p_{\theta}(\mathbf{x}_0)$。
+
+\subsubsection{变分下界（ELBO）的数学推导与展开}
+直接计算边际似然 $p_{\theta}(\mathbf{x}_0) = \int p_{\theta}(\mathbf{x}_{0:T}) d\mathbf{x}_{1:T}$ 是不可行的。因此，我们采用变分推断的方法，优化其负对数似然的变分上界（或者说是对数似然的变分下界 Evidence Lower Bound, ELBO）。
+
+根据Jensen不等式，我们可以推导出损失函数 $L$：
+\begin{align}
+	\mathbb{E}\left[-\log p_{\theta}(\mathbf{x}_0)\right] &\leq \mathbb{E}_q \left[-\log \frac{p_{\theta}(\mathbf{x}_{0:T})}{q(\mathbf{x}_{1:T}|\mathbf{x}_0)}\right] \notag \\
+	&= \mathbb{E}_q \left[-\log p(\mathbf{x}_T) - \sum_{t \geq 1} \log \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{q(\mathbf{x}_t|\mathbf{x}_{t-1})}\right] := L
+	\label{eq:vlb_raw}
+\end{align}
+上式虽然给出了优化的边界，但直接通过蒙特卡洛采样估计该式具有较高的方差。
+
+\subsubsection{KL散度与重参数化技巧的应用}
+为了降低方差并简化计算，我们可以利用贝叶斯公式将 $L$ 重写为多个 KL 散度（Kullback-Leibler Divergence）之和的形式。这一推导利用了扩散过程的马尔可夫性质：
+\begin{equation}
+	L = \mathbb{E}_{q}\left[\underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_{T} \mid \mathbf{x}_{0}\right) \| p\left(\mathbf{x}_{T}\right)\right)}_{L_{T}} + \sum_{t>1} \underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right) \| p_{\theta}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)\right)}_{L_{t-1}} \underbrace{-\log p_{\theta}\left(\mathbf{x}_{0} \mid \mathbf{x}_{1}\right)}_{L_{0}}\right]
+	\label{eq:vlb_kl}
+\end{equation}
+
+公式 (\ref{eq:vlb_kl}) 的核心优势在于，其中的每一项都可以解析地计算：
+\begin{enumerate}
+	\item $L_T$ 项表示前向过程最终分布与标准高斯分布的差异。由于前向过程是固定的，该项不包含可学习参数，训练时可忽略。
+	\item $L_{t-1}$ 项是核心优化目标，它要求网络预测的逆向分布 $p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)$ 尽可能接近真实的前向过程后验分布 $q(\mathbf{x}_{t-1}|\mathbf{x}_t, \mathbf{x}_0)$。
+\end{enumerate}
+
+值得注意的是，虽然 $q(\mathbf{x}_{t-1}|\mathbf{x}_t)$ 不可解，但在已知初始数据 $\mathbf{x}_0$ 的条件下，**前向过程的后验分布** $q(\mathbf{x}_{t-1}|\mathbf{x}_t, \mathbf{x}_0)$ 是可解的高斯分布：
+\begin{equation}
+	q(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}) = \mathcal{N}\left(\mathbf{x}_{t-1} ; \hat{\boldsymbol{\mu}}_{t}\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right), \tilde{\beta}_{t} \mathbf{I}\right)
+\end{equation}
+其均值 $\hat{\boldsymbol{\mu}}_{t}$ 和方差 $\tilde{\beta}_{t}$ 由下式给出：
+\begin{equation}
+	\hat{\boldsymbol{\mu}}_{t}(\mathbf{x}_{t}, \mathbf{x}_{0}) := \frac{\sqrt{\bar{\alpha}_{t-1}} \beta_{t}}{1-\bar{\alpha}_{t}} \mathbf{x}_{0} + \frac{\sqrt{\alpha_{t}}(1-\bar{\alpha}_{t-1})}{1-\bar{\alpha}_{t}} \mathbf{x}_{t}, \quad \tilde{\beta}_{t} := \frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}} \beta_{t}
+	\label{eq:posterior_params}
+\end{equation}
+这意味着我们可以直接利用解析解计算两个高斯分布之间的 KL 散度，从而避免高方差的随机估计。
+
+\subsection{逆向过程的参数化与优化目标}
+在推导出变分下界（ELBO）的通用形式后，本节将详细阐述逆向过程 $p_{\theta}(\mathbf{x}_{t-1} \mid \mathbf{x}_{t})$ 的具体参数化选择。这包括对方差 $\boldsymbol{\Sigma}_{\theta}$ 的设定以及均值 $\boldsymbol{\mu}_{\theta}$ 的神经网络拟合策略，这两者的选择直接决定了生成模型的性能与训练稳定性。
+
+\subsubsection{方差策略与均值的重参数化}
+根据公式 (\ref{eq:vlb_kl})，我们的优化目标由 $L_T$、$L_{1:T-1}$ 和 $L_0$ 组成。
+
+首先考虑 $L_T$ 项，即 $D_{\mathrm{KL}}(q(\mathbf{x}_{T} \mid \mathbf{x}_{0}) \| p(\mathbf{x}_{T}))$。由于前向过程的方差 $\beta_t$ 是预先固定的常数，且 $p(\mathbf{x}_T)$ 是标准高斯分布，因此该项不包含任何可训练参数，在训练过程中可被视为常数忽略。
+
+接下来重点分析核心项 $L_{t-1}$（$1 < t \leq T$）。逆向分布被建模为高斯分布 $p_{\theta}(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}) = \mathcal{N}(\mathbf{x}_{t-1}; \boldsymbol{\mu}_{\theta}(\mathbf{x}_t, t), \boldsymbol{\Sigma}_{\theta}(\mathbf{x}_t, t))$。
+
+**1. 方差 $\boldsymbol{\Sigma}_{\theta}$ 的选择**\\
+Ho 等人（2020）指出，方差项可设置为未经训练的时间相关常数。实验表明，两种极端选择均能取得相似效果：
+\begin{itemize}
+	\item $\sigma_t^2 = \beta_t$：对应于 $\mathbf{x}_0 \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ 时的最优方差（熵上限）。
+	\item $\sigma_t^2 = \tilde{\beta}_t = \frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}} \beta_{t}$：对应于 $\mathbf{x}_0$ 为确定性点时的最优方差（熵下限）。
+\end{itemize}
+在本研究中，为简化计算，我们将方差固定为 $\boldsymbol{\Sigma}_{\theta}(\mathbf{x}_{t}, t)=\sigma_{t}^{2} \mathbf{I} = \beta_t \mathbf{I}$。
+
+**2. 均值 $\boldsymbol{\mu}_{\theta}$ 的噪声预测参数化**\\
+基于固定的方差，KL 散度项 $L_{t-1}$ 可简化为两个高斯分布均值之间的均方误差（MSE）：
+\begin{equation}
+	L_{t-1} = \mathbb{E}_{q}\left[\frac{1}{2 \sigma_{t}^{2}}\left\|\hat{\boldsymbol{\mu}}_{t}(\mathbf{x}_{t}, \mathbf{x}_{0}) - \boldsymbol{\mu}_{\theta}(\mathbf{x}_{t}, t)\right\|^{2}\right] + C
+\end{equation}
+其中 $\hat{\boldsymbol{\mu}}_{t}$ 是前向过程后验分布的真实均值。这表明网络 $\boldsymbol{\mu}_{\theta}$ 的最佳策略是直接预测 $\hat{\boldsymbol{\mu}}_{t}$。利用公式 (\ref{eq:posterior_params}) 并结合重参数化技巧 $\mathbf{x}_{t}(\mathbf{x}_{0}, \boldsymbol{\epsilon}) = \sqrt{\bar{\alpha}_{t}} \mathbf{x}_{0} + \sqrt{1-\bar{\alpha}_{t}} \boldsymbol{\epsilon}$，我们可以将 $\hat{\boldsymbol{\mu}}_{t}$ 展开为只与 $\mathbf{x}_t$ 和噪声 $\boldsymbol{\epsilon}$ 相关的形式：
+\begin{equation}
+	\hat{\boldsymbol{\mu}}_{t}(\mathbf{x}_{t}, \mathbf{x}_{0}) = \frac{1}{\sqrt{\alpha_{t}}}\left(\mathbf{x}_{t} - \frac{\beta_{t}}{\sqrt{1-\bar{\alpha}_{t}}} \boldsymbol{\epsilon}\right)
+\end{equation}
+这启发我们将网络参数化为预测噪声 $\boldsymbol{\epsilon}$ 而非直接预测均值。即令：
+\begin{equation}
+	\boldsymbol{\mu}_{\theta}(\mathbf{x}_{t}, t) = \frac{1}{\sqrt{\alpha_{t}}}\left(\mathbf{x}_{t} - \frac{\beta_{t}}{\sqrt{1-\bar{\alpha}_{t}}} \boldsymbol{\epsilon}_{\theta}(\mathbf{x}_{t}, t)\right)
+	\label{eq:mu_theta_param}
+\end{equation}
+其中 $\boldsymbol{\epsilon}_{\theta}$ 是一个输入为图像 $\mathbf{x}_t$ 和时间步 $t$ 的函数逼近器（通常采用 U-Net 结构）。代入损失函数，得到简化的优化目标：
+\begin{equation}
+	L_{t-1}^{\text{simple}} = \mathbb{E}_{\mathbf{x}_{0}, \boldsymbol{\epsilon}}\left[ \frac{\beta_{t}^{2}}{2 \sigma_{t}^{2} \alpha_{t}(1-\bar{\alpha}_{t})} \left\|\boldsymbol{\epsilon} - \boldsymbol{\epsilon}_{\theta}(\sqrt{\bar{\alpha}_{t}} \mathbf{x}_{0}+\sqrt{1-\bar{\alpha}_{t}} \boldsymbol{\epsilon}, t)\right\|^{2} \right]
+	\label{eq:loss_weighted}
+\end{equation}
+
+\subsubsection{简化损失函数与去噪得分匹配的联系}
+尽管公式 (\ref{eq:loss_weighted}) 包含了复杂的权重系数，但 DDPM 的研究发现，丢弃这些权重系数（即令权重为 1）反而能获得更好的生成质量。最终的训练目标简化为：
+\begin{equation}
+	L_{\text{simple}}(\theta) := \mathbb{E}_{t, \mathbf{x}_0, \boldsymbol{\epsilon}} \left[ \| \boldsymbol{\epsilon} - \boldsymbol{\epsilon}_{\theta}(\mathbf{x}_t, t) \|^2 \right]
+\end{equation}
+这种参数化具有深刻的理论意义：它使得扩散模型的训练过程等价于在多个噪声尺度上的**去噪得分匹配（Denoising Score Matching）**。此时，网络 $\boldsymbol{\epsilon}_{\theta}$ 实际上是在学习数据分布分数的梯度 $\nabla_{\mathbf{x}} \log p_t(\mathbf{x})$。
+
+\subsection{采样算法与离散数据处理}
+
+\subsubsection{采样过程：朗之万动力学视角}
+在训练完成后，利用学习到的 $\boldsymbol{\epsilon}_{\theta}$，我们可以通过逆向过程从随机噪声 $\mathbf{x}_T$ 逐步恢复图像。将公式 (\ref{eq:mu_theta_param}) 代入 $p_{\theta}(\mathbf{x}_{t-1} \mid \mathbf{x}_{t})$ 的采样方程，得到递推公式：
+\begin{equation}
+	\mathbf{x}_{t-1} = \frac{1}{\sqrt{\alpha_{t}}}\left(\mathbf{x}_{t} - \frac{1-\alpha_{t}}{\sqrt{1-\bar{\alpha}_{t}}} \boldsymbol{\epsilon}_{\theta}(\mathbf{x}_{t}, t)\right) + \sigma_{t} \mathbf{z}
+\end{equation}
+其中 $\mathbf{z} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ 是为了模拟逆向过程随机性引入的高斯噪声（当 $t=1$ 时 $\mathbf{z}=\mathbf{0}$）。
+
+这一采样过程（详见表 \ref{tab:algo_sampling}）在形式上与**朗之万动力学（Langevin Dynamics）**采样高度一致。$\boldsymbol{\epsilon}_{\theta}$ 提供了向高密度数据区域移动的梯度方向，而 $\sigma_t \mathbf{z}$ 项则防止采样陷入局部最优解，确保生成分布的多样性。
+
+\begin{table}[htbp]
+	\centering
+	\caption{DDPM 训练与采样算法流程}
+	\label{tab:algo_sampling}
+	\begin{tabular}{p{0.45\textwidth}|p{0.45\textwidth}}
+		\hline
+		\textbf{算法 1：训练过程 (Training)} & \textbf{算法 2：采样过程 (Sampling)} \\
+		\hline
+		\vspace{0.1em}
+		1: \textbf{repeat} & 1: $\mathbf{x}_{T} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ \\
+		2: \quad 从数据集中采样 $\mathbf{x}_{0} \sim q(\mathbf{x}_{0})$ & 2: \textbf{for} $t=T, \ldots, 1$ \textbf{do} \\
+		3: \quad 随机采样时间步 $t \sim \text{Uniform}(\{1, \ldots, T\})$ & 3: \quad $\mathbf{z} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ if $t > 1$, else $\mathbf{z}=\mathbf{0}$ \\
+		4: \quad 采样噪声 $\boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ & 4: \quad $\mathbf{x}_{t-1} = \frac{1}{\sqrt{\alpha_t}}(\mathbf{x}_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t)) + \sigma_t \mathbf{z}$ \\
+		5: \quad 执行梯度下降优化： & 5: \textbf{end for} \\
+		\quad \quad $\nabla_{\theta}\left\|\boldsymbol{\epsilon}-\boldsymbol{\epsilon}_{\theta}\left(\sqrt{\bar{\alpha}_{t}} \mathbf{x}_{0}+\sqrt{1-\bar{\alpha}_{t}} \boldsymbol{\epsilon}, t\right)\right\|^{2}$ & 6: \textbf{return} $\mathbf{x}_{0}$ \\
+		6: \textbf{until} converged & \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\subsubsection{数据缩放与解码项 $L_0$}
+为了保证数学推导的严谨性，我们假设图像像素数据 $\{0, 1, \ldots, 255\}$ 被线性缩放到 $[-1, 1]$ 区间。这确保了输入数据与标准高斯先验 $p(\mathbf{x}_T)$ 处于相同的数量级，有利于神经网络训练。
+
+对于逆向过程的最后一步 $L_0 = -\log p_{\theta}(\mathbf{x}_0 \mid \mathbf{x}_1)$，我们采用独立的离散解码器。由于图像数据是离散的，我们对连续的高斯分布 $\mathcal{N}(\mathbf{x}_0; \boldsymbol{\mu}_{\theta}(\mathbf{x}_1, 1), \sigma_1^2 \mathbf{I})$ 在每个像素值的区间 $[x-1/255, x+1/255]$ 上进行积分，从而获得离散对数似然。这种处理方式类似于 VAE 和 PixelCNN 中的做法，确保了模型评估的变分下界是离散数据的无损码长（Lossless Codclength），使得不同模型之间的对数似然指标具有可比性。
+

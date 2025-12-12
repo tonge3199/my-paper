@@ -1,0 +1,19 @@
+\contentsline {section}{摘要}{2}{section*.1}%
+\contentsline {section}{Abstract}{3}{section*.2}%
+\contentsline {section}{\numberline {1}引言}{4}{section.1}%
+\contentsline {section}{\numberline {2}扩散生成模型的数学原理与理论推导}{5}{section.2}%
+\contentsline {subsection}{\numberline {2.1}扩散模型的基本框架}{5}{subsection.2.1}%
+\contentsline {subsubsection}{\numberline {2.1.1}前向扩散过程：基于马尔可夫链的高斯加噪机制}{5}{subsubsection.2.1.1}%
+\contentsline {subsubsection}{\numberline {2.1.2}逆向去噪过程：参数化的去噪分布估计}{5}{subsubsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.2}变分推断与目标函数推导}{6}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}变分下界（ELBO）的数学推导与展开}{6}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}KL散度与重参数化技巧的应用}{6}{subsubsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.3}逆向过程的参数化与优化目标}{7}{subsection.2.3}%
+\contentsline {subsubsection}{\numberline {2.3.1}方差策略与均值的重参数化}{7}{subsubsection.2.3.1}%
+\contentsline {subsubsection}{\numberline {2.3.2}简化损失函数与去噪得分匹配的联系}{8}{subsubsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.4}采样算法与离散数据处理}{8}{subsection.2.4}%
+\contentsline {subsubsection}{\numberline {2.4.1}采样过程：朗之万动力学视角}{8}{subsubsection.2.4.1}%
+\contentsline {subsubsection}{\numberline {2.4.2}数据缩放与解码项 $L_0$}{8}{subsubsection.2.4.2}%
+\contentsline {section}{\numberline {3}ch2这里是二}{9}{section.3}%
+\contentsline {section}{参考文献}{10}{section.3}%
+\contentsfinish 

@@ -1,0 +1,32 @@
+% 手动开启新页（include通常会自动换页，但clearpage更保险）
+\clearpage
+
+% 创建锚点并手动添加目录项
+\phantomsection
+\addcontentsline{toc}{section}{摘要}
+
+% ====== 摘要内容部分 ======
+\begin{spacing}{1.0} % 单倍行距
+	\vspace*{0.5em}  % 段前间距
+	
+	% 标题：小四号楷体加粗
+	\noindent{\kaiti\zihao{-4}\bfseries 【摘要】} 
+	
+	% 内容：五号楷体
+	{\kaiti\zihao{5}
+		这里是中文摘要的内容。要求字体为五号楷体。单倍行距、段前段后0.5行、两端对齐排版。本研究主要探讨了......
+		
+		这里是第二段内容，测试段落间距是否符合要求。
+	}
+\end{spacing}
+\vspace{0.5em} % 段后间距
+
+% ====== 关键词部分 ======
+\begin{spacing}{1.0}
+	\vspace{0.5em}
+	% 标题：小四号楷体加粗
+	\noindent{\kaiti\zihao{-4}\bfseries 【关键词】} 
+	
+	% 内容：五号楷体
+	{\kaiti\zihao{5} 深度学习；图像识别；卷积神经网络；LaTeX}
+\end{spacing}

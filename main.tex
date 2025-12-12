@@ -1,0 +1,45 @@
+% !TeX program = xelatex
+% !TeX encoding = UTF-8
+
+\documentclass{szuthesis}
+
+% ==========================================
+% 标题信息定义
+% ==========================================
+\title{基于扩散过程的图像生成模型构建与验证}
+\author{李涌}
+
+\usepackage{amsmath, amssymb} % 添加数学宏包
+\usepackage{bm} % 向量符号宏包
+
+% ==========================================
+% 正文开始
+% ==========================================
+\begin{document}
+	
+	% 1. 封面
+	%\maketitle
+	
+	% 2. 目录
+	\tableofcontents
+	
+	% 3. 中文摘要 (对应 chapters/abstract.tex)
+	\include{chapters/abstract}
+	% 4. 英文摘要 (对应 chapters/abstract_en.tex)
+	\include{chapters/abstract_en}
+	
+	% 5. 正文章节
+	\include{chapters/intro}
+	\include{chapters/ch1}
+	\include{chapters/ch2}
+	
+	% 6. 参考文献
+	% 注意：由于 szuthesis.cls 中定义了 thebibliography 环境会自动换页，
+	% 这里直接写即可。如果参考文献很多，也可以单独放入 chapters/refs.tex
+	\begin{thebibliography}{99}
+		\bibitem{knuth84} Knuth D E. The TeXbook[M]. Addison-Wesley, 1984.
+		\bibitem{zhang2025} 张三. 深度学习入门[J]. 计算机学报, 2025, 1(1): 1-10.
+	\end{thebibliography}
+	
+	
+\end{document}

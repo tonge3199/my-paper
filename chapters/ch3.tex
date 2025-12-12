@@ -1,0 +1,43 @@
+% chapter3.tex
+\chapter{图像生成模型的设计与算法实现}
+\label{chap:implementation}
+
+\section{模型整体架构设计}
+
+  \subsection{噪声预测网络总体结构}
+  % Describe the overall architecture
+
+  \subsection{基于U-Net的特征提取与还原模块设计}
+  % Detailed U-Net design, Downsample, Upsample blocks
+  本研究采用改进的 U-Net 结构作为噪声预测网络 $\epsilon_\theta$……
+
+  \subsection{时间步嵌入（Time Embedding）的位置编码实现}
+  % Sinusoidal positional embeddings
+  为了使网络感知当前的扩散步数 $t$，采用了正弦位置编码……
+
+\section{条件控制机制的实现}
+
+  \subsection{类别信息的嵌入方法}
+  % Class Embedding
+
+  \subsection{无分类器引导（Classifier-Free Guidance）的实现原理}
+  % CFG implementation details
+
+\section{核心算法的伪代码与程序流程}
+
+  \subsection{训练阶段：随机时间步采样与梯度下降算法}
+  % You can use the algorithm environment here
+	\begin{algorithm}
+		\caption{DDPM 训练过程}
+		\begin{algorithmic}
+			\STATE \textbf{Input:} Training data distribution $q(x_0)$
+			\STATE \textbf{Repeat:}
+			\STATE \quad Sample $x_0 \sim q(x_0)$
+			\STATE \quad Sample $t \sim \text{Uniform}(\{1, \dots, T\})$
+			\STATE \quad Sample $\epsilon \sim \mathcal{N}(0, \mathbf{I})$
+			\STATE \quad Take gradient descent step on $\nabla_\theta \| \epsilon - \epsilon_\theta(\sqrt{\bar{\alpha}_t} x_0 + \sqrt{1-\bar{\alpha}_t}\epsilon, t) \|^2$
+			\STATE \textbf{Until} converged
+		\end{algorithmic}
+	\end{algorithm}
+
+  \subsection{推理阶段：逐步去噪与图像生成的迭代算法}

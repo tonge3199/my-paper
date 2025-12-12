@@ -1,0 +1,32 @@
+% 手动开启新页
+\clearpage
+
+% 创建锚点并手动添加目录项
+\phantomsection
+\addcontentsline{toc}{section}{Abstract}
+
+% ====== Abstract Content ======
+\begin{spacing}{1.0} % Single spacing
+	\vspace*{0.5em}
+	
+	% Title: Size -4 (Small 4), Bold
+	\noindent{\zihao{-4}\bfseries 【Abstract】} 
+	
+	% Content: Size 5, Standard Font (Times New Roman)
+	{\zihao{5}
+		This is the abstract content. The font should be Size 5. Single line spacing, 0.5 lines before and after paragraph, justified alignment.
+		
+		This is the second paragraph to test the spacing.
+	}
+\end{spacing}
+\vspace{0.5em}
+
+% ====== Key words ======
+\begin{spacing}{1.0}
+	\vspace{0.5em}
+	% Title: Size -4, Bold
+	\noindent{\zihao{-4}\bfseries 【Key words】} 
+	
+	% Content: Size 5
+	{\zihao{5} Deep Learning; Image Recognition; CNN; LaTeX}
+\end{spacing}
